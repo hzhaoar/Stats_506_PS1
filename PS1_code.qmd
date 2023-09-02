@@ -102,6 +102,65 @@ rownames(table) <- c("Overall average", "Class 1 average", "Class 2 average", "C
 print(table)
 ```
 
+### Task (e)
+
+```{r}
+ashClass1 <- data[which(data$class == 1),]$Ash
+ashClass2 <- data[which(data$class == 2),]$Ash
+ashClass3 <- data[which(data$class == 3),]$Ash
+```
+
+Then we carry t-test on either 2 classes, respectively. Here, we just pick $\alpha = 0.05$ for convenience.
+
+```{r}
+alpha <- 0.05
+names(t.test(ashClass1, ashClass2, alternative = "two.sided", conf.level = 1-alpha))
+```
+
 $$
 t_1 = \frac{\hat{\beta_1}-\beta_1^0}{s.e.(\hat{\beta_1)}}
 $$
+
+## Problem 2
+
+```{r}
+#Clear the environment
+rm(list=ls())
+```
+
+
+```{r}
+isPerfectPower <- function(numCheck, power){
+  root <- numCheck^(1/power)
+  rootToInt <- round(root)
+  if (all.equal(root, rootToInt) == TRUE){
+    return(list(TRUE,root))
+  }
+  return(list(FALSE,root))
+}
+```
+
+```{r}
+findRootPower <- function(numCheck){
+  if (numCheck == 1){
+    print("Your input is 1. You can express it as 1^n for any natural number n")
+    return(NULL)
+  }
+  maxPower <- ceiling(log(numCheck, base = 2))
+  for(currPower in 2:maxPower){
+    returnList <- isPerfectPower(numCheck, currPower)
+    isPerfect <- returnList[1]
+    root <- returnList[2]
+    if(isPerfect == TRUE){
+      print("Your input is a perfect power.")
+      return(cat(toString(numCheck),"=",toString(root),"^",toString(currPower)))
+    }
+  }
+  print("Your input is not a perfect power.")
+}
+```
+
+```{r}
+findRootPower(2047)
+```
+
