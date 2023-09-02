@@ -1,0 +1,63 @@
+---
+title: "PS1_code"
+format: html
+editor: visual
+---
+
+## Quarto
+
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+
+## Running Code
+
+When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+
+```{r}
+1 + 1
+```
+
+You can add options to executable code like this
+
+```{r}
+#| echo: false
+2 * 2
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
+
+## Problem 1
+
+### Task (a)
+
+We read the data set first.
+
+```{r}
+data <- read.table("./wine.data", sep = ",", header = FALSE)
+data <- data.frame(data)
+```
+
+And we need to name each column using information in `wine.names`.
+
+```{r}
+colnames(data) <- c("class", "Alcohol", "Malic acid", "Ash", "Alcalinity of ash", "Magnesium", "Total phenols", "Flavanoids", "Nonflavanoid phenols", "Proanthocyanins", "Color intensity", "Hue", "OD280/OD315 of diluted wines", "Proline")
+```
+
+### Task (b)
+
+Here, we check whether the column names match the class and attributes in `wine.names`.
+
+```{r}
+print(data)
+```
+
+```{r}
+data[which.max(data$Alcohol),]$class
+```
+
+```{r}
+length(which(data$Magnesium > 114))
+```
+
+```{r}
+which(((data$Magnesium > 114) & (data$class == 1)))
+```
