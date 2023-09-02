@@ -4,26 +4,9 @@ format: html
 editor: visual
 ---
 
-## Quarto
-
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
 ## Running Code
 
 When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
-
-```{r}
-1 + 1
-```
-
-You can add options to executable code like this
-
-```{r}
-#| echo: false
-2 * 2
-```
-
-The `echo: false` option disables the printing of code (only output is displayed).
 
 ## Problem 1
 
@@ -39,7 +22,8 @@ data <- data.frame(data)
 And we need to name each column using information in `wine.names`.
 
 ```{r}
-colnames(data) <- c("class", "Alcohol", "Malic acid", "Ash", "Alcalinity of ash", "Magnesium", "Total phenols", "Flavanoids", "Nonflavanoid phenols", "Proanthocyanins", "Color intensity", "Hue", "OD280/OD315 of diluted wines", "Proline")
+attribNames <- c("class", "Alcohol", "Malic acid", "Ash", "Alcalinity of ash", "Magnesium", "Total phenols", "Flavanoids", "Nonflavanoid phenols", "Proanthocyanins", "Color intensity", "Hue", "OD280/OD315 of diluted wines", "Proline")
+colnames(data) <- attribNames
 ```
 
 ### Task (b)
@@ -50,14 +34,74 @@ Here, we check whether the column names match the class and attributes in `wine.
 print(data)
 ```
 
+### Task (c)
+
+1.The wine with the highest alcohol content belongs to which class?
+
 ```{r}
 data[which.max(data$Alcohol),]$class
 ```
 
-```{r}
-length(which(data$Magnesium > 114))
-```
+2.The wine with the lowest alcohol content belongs to which class?
 
 ```{r}
-which(((data$Magnesium > 114) & (data$class == 1)))
+data[which.min(data$Alcohol),]$class
 ```
+
+3.German beers have, on average, 114 mg/l of magnesium. How many of these wines have higher levels of magnesium than that?
+
+```{r}
+averMag <- 114
+length(which(data$Magnesium > averMag))
+```
+
+4.Within each class, how many wines have higher levels of magnesium than average German beer?
+
+```{r}
+num_class <- max(data$class)
+for (i in 1:num_class){
+  
+  #Compute the number of wines for class i
+  
+  numWines <- length(which(((data$Magnesium > averMag) & (data$class == i)))) 
+  
+  #Print the result as a sentence
+  
+  cat("Within class ", toString(i) , ", ", toString(numWines) , " wines have higher levels of magnesium than average German beer.\n")
+}
+```
+
+### Task (d)
+
+```{r}
+#table <- data.frame(matrix(0,))
+#colMeans(data[,-1])
+
+# Number of rows and number of attributes of wine data set
+
+numRows <- dim(data)[1]
+numAttrib <- dim(data)[2]-1
+
+# Create an empty table to contain the statistics computed
+
+table <- matrix(0, nrow = 4, ncol = numAttrib)
+table <- data.frame(table)
+
+# Compute the statistics (Overall average and average within each class) and fill them in the table
+
+table[1,] = colMeans(data[,-1])
+table[2,] =colMeans(data[which(data$class == 1),-1])
+table[3,] =colMeans(data[which(data$class == 2),-1])
+table[4,] =colMeans(data[which(data$class == 3),-1])
+
+# Name each rows columns
+colnames(table) <- attribNames[-1]
+rownames(table) <- c("Overall average", "Class 1 average", "Class 2 average", "Class 3 average")
+
+# Print the table
+print(table)
+```
+
+$$
+t_1 = \frac{\hat{\beta_1}-\beta_1^0}{s.e.(\hat{\beta_1)}}
+$$
