@@ -161,6 +161,6 @@ findRootPower <- function(numCheck){
 ```
 
 ```{r}
-findRootPower(2047)
+findRootPower(4044121)
 ```
 
