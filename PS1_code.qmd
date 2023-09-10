@@ -4,7 +4,7 @@ format: html
 editor: visual
 ---
 
-
+Link to my GitHub repository: https://github.com/hzhaoar/Stats_506_PS1
 
 ## Problem 1
 
