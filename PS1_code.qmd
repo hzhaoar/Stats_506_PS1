@@ -4,15 +4,11 @@ format: html
 editor: visual
 ---
 
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
-
 ## Problem 1
 
 ### Task (a)
 
-We read the data set first.
+We read the data first.
 
 ```{r}
 data <- read.table("./wine.data", sep = ",", header = FALSE)
@@ -28,11 +24,15 @@ colnames(data) <- attribNames
 
 ### Task (b)
 
-Here, we check whether the column names match the class and attributes in `wine.names`.
+Here, we check whether the number of wines within each class is correct as reported in "wine.names".
 
 ```{r}
-print(data)
+length(which(data$class == 1))
+length(which(data$class == 2))
+length(which(data$class == 3))
 ```
+
+The numbers are clearly correct.
 
 ### Task (c)
 
@@ -60,13 +60,10 @@ length(which(data$Magnesium > averMag))
 ```{r}
 num_class <- max(data$class)
 for (i in 1:num_class){
-  
   #Compute the number of wines for class i
-  
   numWines <- length(which(((data$Magnesium > averMag) & (data$class == i)))) 
   
   #Print the result as a sentence
-  
   cat("Within class ", toString(i) , ", ", toString(numWines) , " wines have higher levels of magnesium than average German beer.\n")
 }
 ```
@@ -74,21 +71,15 @@ for (i in 1:num_class){
 ### Task (d)
 
 ```{r}
-#table <- data.frame(matrix(0,))
-#colMeans(data[,-1])
-
 # Number of rows and number of attributes of wine data set
-
 numRows <- dim(data)[1]
 numAttrib <- dim(data)[2]-1
 
 # Create an empty table to contain the statistics computed
-
 table <- matrix(0, nrow = 4, ncol = numAttrib)
 table <- data.frame(table)
 
 # Compute the statistics (Overall average and average within each class) and fill them in the table
-
 table[1,] = colMeans(data[,-1])
 table[2,] =colMeans(data[which(data$class == 1),-1])
 table[3,] =colMeans(data[which(data$class == 2),-1])
@@ -105,33 +96,116 @@ print(table)
 ### Task (e)
 
 ```{r}
+# Based on class, divide ash column into 3 vectors
 ashClass1 <- data[which(data$class == 1),]$Ash
 ashClass2 <- data[which(data$class == 2),]$Ash
 ashClass3 <- data[which(data$class == 3),]$Ash
 ```
 
-Then we carry t-test on either 2 classes, respectively. Here, we just pick $\alpha = 0.05$ for convenience.
+Then we carry t-test on either 2 classes, respectively.
 
 ```{r}
-alpha <- 0.05
-names(t.test(ashClass1, ashClass2, alternative = "two.sided", conf.level = 1-alpha))
+t.test(ashClass1, ashClass2, alternative = "two.sided")
+t.test(ashClass1, ashClass3, alternative = "two.sided")
+t.test(ashClass2, ashClass3, alternative = "two.sided")
 ```
 
+Here, the null hypothesis is
+
+> > $H_0^{1,2}$: The true difference in means between Class 1 and Class 2 is equal to 0.
+
+> > $H_0^{1,3}$: The true difference in means between Class 1 and Class 3 is equal to 0.
+
+> > $H_0^{2,3}$: The true difference in means between Class 2 and Class 3 is equal to 0.
+
+And if we pick $\alpha = 0.05$ for convenience, our conclusion is that
+
+> We do not reject $H_0^{1,3}$, and we do reject $H_0^{1,2}$ and $H_0^{2,3}$.
+
+#### Extra credit
+
+Then, we try to manually calculate the p-value for the 3 pairs of classes. I have no idea about how to carry on T-test on two groups with unequal variance, so I searched online and obtained the concept of Welch's t-test. Definition and formulas of Welch's t-test are in the following URL [Welch's t-test](https://en.wikipedia.org/wiki/Welch%27s_t-test).
+
+And here we just need to write the formulas into two R functions.
+
+The first function calculates the t-statistics given two groups using formula
+
 $$
-t_1 = \frac{\hat{\beta_1}-\beta_1^0}{s.e.(\hat{\beta_1)}}
+t = \frac{\overline{X}_1-\overline{X}_2}{\sqrt{s_\bar{X_1}^2+s_\bar{X_2}^2}}\text{, }\text{and }s_\bar{X_i}=\frac{s_i}{\sqrt{N_i}}
 $$
+
+```{r}
+calTstat <- function(class1, class2){
+  sBar1 <- sd(class1)/sqrt(length(class1))
+  sBar2 <- sd(class2)/sqrt(length(class2))
+  t <- (mean(class1)-mean(class2))/sqrt(sBar1^2+sBar2^2)
+  return(t)
+}
+```
+
+The second function calculates the degree of freedom of the t-distribution using formula
+
+$$
+\nu\approx\frac{(\frac{s_1^2}{N_1}+\frac{s_2^2}{N_2})^2}{\frac{s_1^4}{N_1^2\nu_1}+\frac{s_2^4}{N_2^2\nu_1}}\text{ , where }\nu_i=N_i-1
+$$
+
+```{r}
+calDf <- function(class1, class2){
+  s1 <- sd(class1)
+  s2 <- sd(class2)
+  N1 <- length(class1)
+  N2 <- length(class2)
+  df1 <- N1-1
+  df2 <- N2-1
+  df <- (s1^2/N1+s2^2/N2)^2/(s1^4/(N1^2*df1)+s2^4/(N2^2*df2))
+  return(df)
+}
+```
+
+And, p-value can be obtained by
+
+$$
+\mathbb{P}(|t_{\frac{\alpha}{2},\nu}|\geq|t_{stat}|)=2\cdot\mathbb{P}(t_{\frac{\alpha}{2},\nu}\geq|t_{stat}|)
+$$
+
+```{r}
+calPValue <- function(class1, class2){
+  return(2*pt(abs(calTstat(class1,class2)),calDf(class1,class2),lower.tail = FALSE))
+}
+```
+
+And the result is the same as what R functions gave.
+
+```{r}
+pValue12 <- calPValue(ashClass1, ashClass2)
+pValue13 <- calPValue(ashClass1, ashClass3)
+pValue23 <- calPValue(ashClass2, ashClass3)
+c(pValue12 ,pValue13, pValue23)
+```
 
 ## Problem 2
 
 ```{r}
-#Clear the environment
+# Clear the environment
 rm(list=ls())
 ```
 
+## Task (a)
+
 ```{r}
+#' Identify whether a given integer is a perfect power for a given power.
+#' @param numCheck is the number that needs to check, which should be an integer
+#' @param power is the specified power, which should also be an integer
+#' @return A list of length 2; the first entry is a logical, the second is the root of the input, no matter it is a perfect power or not.
+
 isPerfectPower <- function(numCheck, power){
+  # Find the root
   root <- numCheck^(1/power)
+  
+  # Find the integer closest to the root
   rootToInt <- round(root)
+  
+  # If the root equals to the integer closest to it, then the root must be an integer.
   if (all.equal(root, rootToInt) == TRUE){
     return(list(TRUE,root))
   }
@@ -139,23 +213,44 @@ isPerfectPower <- function(numCheck, power){
 }
 ```
 
+### Task (b)
+
 ```{r}
 findRootPower <- function(numCheck){
+  # Special case: when n = 1
   if (numCheck == 1){
     return("Your input is 1. You can express it as 1^n for any natural number n.")
   }
+  
+  # Upper bound for the searching: the smallest possible base is 2, so an upper bound for the power is just log_2(numCheck).
   maxPower <- ceiling(log(numCheck, base = 2))
+  
+  # Linear search from 2 to the upper bound: It can find the root with smallest power.
   for(currPower in 2:maxPower){
+    # Render values that isPerfectPower returns
     returnList <- isPerfectPower(numCheck, currPower)
     isPerfect <- returnList[1]
     root <- returnList[2]
+    
+    # Generate the return massage for the perfect-power case
     if(isPerfect == TRUE){
       return(cat(toString(numCheck),"=",toString(root),"^",toString(currPower)))
     }
   }
+  
+  # Generate the return massage for the non-perfect-power case
   return(cat(toString(numCheck),"is not a perfect power."))
 }
 ```
+
+Use this new function to identify whether each of the following is a perfect power, and if so what its root and power is.
+
+1.  27
+2.  13060694016
+3.  7776
+4.  170859375
+5.  58247422
+6.  94143178827
 
 ```{r}
 checkList <- c(27, 13060694016, 7776, 170859375, 58247422, 94143178827)
@@ -167,13 +262,18 @@ for (i in checkList){
 
 ## Problem 3
 
+```{r}
+# Clear the environment
+rm(list=ls())
+```
+
 ### Task (a)
 
-The following prompt was put in ChatGPT.
+The following prompt was put in `ChatGPT`.
 
 > Produce two R functions: The first should take in a vector of suits and a vector of ranks representing a 5-card hand, and return the name of the hand (in 5 card stud poker). The second should simulate dealing a round of cards in a game of poker (5 card stud). The user should be able to specify the number of players. Show the user all the hands, and use the first function to display the name of each of the hands.
 
-The following code is generated by `ChatGPT`.
+The following code and comments are generated by `ChatGPT`.
 
 ```{r}
 # Define a function to determine the name of a poker hand
@@ -239,42 +339,48 @@ deal_poker_round <- function(num_players) {
     cat("Hand Name:", hand_name, "\n\n")
   }
 }
+```
 
+```{r}
 # Example usage: Simulate a round of poker with 4 players
 deal_poker_round(4)
 ```
 
-Also, there is a text output generated by ChatGPT.
+Also, there is a text output generated by `ChatGPT`.
 
 > These functions should allow you to simulate a round of 5-card stud poker with a specified number of players and determine the name of each player's hand using the first function.
 
 ### Task (b)
 
-Debug function 1
+Demonstrate these two functions for different numbers of players
+
+```{r}
+# Test 1
+deal_poker_round(4)
+```
+
+No run-time error in test 1.
+
+```{r}
+# Test 2
+deal_poker_round(3)
+```
+
+No run-time error in test 2.
+
+```{r}
+# Test 3
+deal_poker_round(6)
+```
+
+Problem occurs in test 3. The problem is that function `get_poker_hand_name` expects inputs for `Rank` as a numeric vector. However, function `deal_poker_round` sometimes passes non-numeric vectors in `Rank` parameter. We need to implement a conversion for this case as follows.
 
 ```{r}
 # Define a function to determine the name of a poker hand
 get_poker_hand_name <- function(suits, ranks) {
   
-  #print(i)
-  #print("is started")
-  
-  # Throw error when input parameters are illegal.
-  if ((length(suits) != 5) || (length(ranks) != 5)){
-    stop("It is not a legal input. Case 1")
-  }
-  
-  suitsList <- c("Hearts", "Diamonds", "Clubs", "Spades")
-  for(s in suits){
-    if(!(s %in% suitsList)){
-      stop("It is not a legal input. Case 2")
-    }
-  }
-  
-  # Convert ranks into integers
-  # "Jack", "Queen", "King", "Ace" are to be converted to 11, 12, 13, 14, respectively.
-  
-  
+  # Modifications here
+  # Convert Strings to integers for later comparisons 
   for(j in 1:length(ranks)){
     if(identical(ranks[j], "Jack")){
       ranks[j] <- 11
@@ -290,24 +396,18 @@ get_poker_hand_name <- function(suits, ranks) {
     }
   }
   
-  ranks <- as.numeric(ranks)
+  # Regard ranks as a numeric vector
+  ranks <- as.numeric(ranks)  
   
   if (length(unique(ranks)) == 5) {
     if (max(ranks) - min(ranks) == 4) {
       if (length(unique(suits)) == 1) {
-        if (max(ranks) == 14){
-          return("Royal flush")
-        } else {
-          return("Straight Flush")
-        }
+        return("Straight Flush")
       } else {
         return("Straight")
       }
     }
   }
-  
-  #print("first if finished")
-  
   if (length(unique(ranks)) == 2) {
     counts <- table(ranks)
     if (max(counts) == 4) {
@@ -319,9 +419,6 @@ get_poker_hand_name <- function(suits, ranks) {
       }
     }
   }
-  
-  #print("second if finished")
-  
   if (length(unique(suits)) == 1) {
     return("Flush")
   }
@@ -330,9 +427,7 @@ get_poker_hand_name <- function(suits, ranks) {
     return("Three of a Kind")
   }
   if (max(counts) == 2) {
-    
-    # Find the second largest item in counts
-    if (sort(counts, decreasing = TRUE)[2] == 2) {
+    if (min(counts) == 2) {
       return("Two Pair")
     } else {
       return("One Pair")
@@ -342,7 +437,192 @@ get_poker_hand_name <- function(suits, ranks) {
 }
 ```
 
-Debug function 2
+After the debugging, we rerun the test for several inputs.
+
+```{r}
+# Rerun 1
+deal_poker_round(6)
+```
+
+No run-time error in Rerun 1.
+
+```{r}
+# Rerun 2
+deal_poker_round(3)
+```
+
+No run-time error in Rerun 2.
+
+```{r}
+# Rerun 3
+deal_poker_round(7)
+```
+
+Problem occurs in rerun 3. Problem occurs because function `deal_poker_round` cannot deal cards to players correctly. It deal $i$ cards instead of 5 cards to $i_{th}$ player. Also, it can not handle the case that the deck is not enough to be dealt to the players. We need to modify function `deal_poker_round` to fix the problem.
+
+```{r}
+# Define a function to simulate dealing a round of poker
+deal_poker_round <- function(num_players) {
+  
+  # Modified
+  if (num_players > 10){
+    return("We cannot have more than 10 hands, since there are only 52 cards.")
+  }  
+  
+  # Define the suits and ranks
+  suits <- c("Hearts", "Diamonds", "Clubs", "Spades")
+  ranks <- c(2, 3, 4, 5, 6, 7, 8, 9, 10, "Jack", "Queen", "King", "Ace")
+  
+  # Create a deck of cards
+  deck <- expand.grid(Rank = ranks, Suit = suits)
+  
+  # Shuffle the deck
+  shuffled_deck <- deck[sample(nrow(deck)), ]
+  
+  # Deal cards to players
+  player_hands <- list()
+  for (i in 1:num_players) {
+    
+    player_hands[[i]] <- shuffled_deck[((i - 1) * 5 + 1):(i * 5), ] # Modified
+    
+    cat("Player", i, "hand:\n")
+    print(player_hands[[i]])
+    hand_name <- get_poker_hand_name(player_hands[[i]]$Suit, player_hands[[i]]$Rank)
+    cat("Hand Name:", hand_name, "\n\n")
+  }
+}
+```
+
+After the debugging, we continue to rerun these two functions.
+
+```{r}
+# Rerun 4
+deal_poker_round(7)
+```
+
+```{r}
+# Rerun 5
+deal_poker_round(8)
+```
+
+No run-time error in Rerun 5.
+
+```{r}
+# Rerun 6
+deal_poker_round(11)
+```
+
+No run-time error in Rerun 6. The program seems OK now, at least for running with no run-time errors.
+
+Notice that expect Rerun 6, we cannot display the output in a good interface look, since the program is trying to directly print a data-frame. We will fix this problem in later tasks.
+
+### Task (c)
+
+Explain line-by-line what the code is doing.
+
+Function `get_poker_hand_name`.
+
+```{r}
+# Define a function to determine the name of a poker hand
+get_poker_hand_name <- function(suits, ranks) {           # Take in two vectors as input, suits is a vector of strings, ranks is a vector of a mixture of strings and integers
+  
+  # Modifications here
+  # Convert Strings to integers for later comparisons 
+  for(j in 1:length(ranks)){                              # iterate over vector ranks
+    if(identical(ranks[j], "Jack")){                      # convert "Jack" into 11
+      ranks[j] <- 11
+    }
+    if(identical(ranks[j], "Queen")){
+      ranks[j] <- 12                                      # convert "Queen" into 12
+    }
+    if(identical(ranks[j], "King")){
+      ranks[j] <- 13                                      # convert "King" into 13
+    }
+    if(identical(ranks[j], "Ace")){       
+      ranks[j] <- 14                                      # convert "Ace" into 14
+    }
+  }
+  
+  ranks <- as.numeric(ranks)                              # Regard ranks as a numeric vector 
+  
+  if (length(unique(ranks)) == 5) {                       # check whether the elements ranks are all different. This is necessary for a straight to occur.
+    if (max(ranks) - min(ranks) == 4) {                   # In this case, if the largest and smallest elements in ranks differ by 4, it forms a straight.
+      if (length(unique(suits)) == 1) {                   # If there is only one type of suit, then the straight is a straight flush.
+        return("Straight Flush")
+      } else {                                            # Otherwise, it is just a straight. 
+        return("Straight")
+      }
+    }
+  }
+  
+  if (length(unique(ranks)) == 2) {                       # If there are only two types of ranks, then the hand should be either "four of a kind" or "full house" since 5 = 4 + 1 or 5 = 3 + 2 are all length-2 decomposition for number 5.
+    counts <- table(ranks)                                # count the times that each ranks occurs. Notice that the length of counts must be 2.
+    if (max(counts) == 4) {                               # If the larger one is 4, then the hand must be a "four of a kind".
+      return("Four of a Kind")
+    }
+    if (max(counts) == 3) {                               # If the larger one is 3, then the hand must be a "full house".
+      if (min(counts) == 2) {                             # This line is redundant since the smaller one must be 2 for a length-2 vector. 
+        return("Full House")
+      }
+    }
+  }
+  if (length(unique(suits)) == 1) {                       # If the hand only contains one type of suit and the hand is not a straight flush, then it must just be a flush.
+    return("Flush")
+  }
+  counts <- table(ranks)                                  # This line is also redundant, since counts have already been defined. 
+  if (max(counts) == 3) {                                 # If there are 3 cards with the same rank, and the hand is neither "full house" nor "four of a kind", then it must be a "three of a kind".
+    return("Three of a Kind")
+  }
+  if (max(counts) == 2) {                                 # This line means " at least one pair occurs".
+    if (min(counts) == 2) {                               # This line is problematic, since it means "if all the cards in the hand is in pairs", which is impossible. Instead, it should implement "4 cards in the hand are in pairs". 
+      return("Two Pair")
+    } else {                                              # There are not 2 pairs and there is 1 pair, then the hand must be "one pair".
+      return("One Pair")
+    }
+  }
+  return("High Card")                                     # Otherwise, it is a "high card".
+}
+```
+
+Function `deal_poker_round`
+
+```{r}
+# Define a function to simulate dealing a round of poker
+deal_poker_round <- function(num_players) {
+  
+  # Modified
+  if (num_players > 10){                                  # If the deck is not enough to be dealt to players, then we need to throw an error message.
+    return("We cannot have more than 10 hands, since there are only 52 cards.")
+  }  
+  
+  # Define the suits and ranks
+  suits <- c("Hearts", "Diamonds", "Clubs", "Spades")
+  ranks <- c(2, 3, 4, 5, 6, 7, 8, 9, 10, "Jack", "Queen", "King", "Ace")
+  
+  # Create a deck of cards
+  deck <- expand.grid(Rank = ranks, Suit = suits)         # create a table that contains all possible combinations of ranks and suits. For example, expand.grid(c(1,2),c("a","b","c")) generates ((1,a),(2,a),(1,b),(2,b),(1,c),(2,c)).
+  
+  # Shuffle the deck
+  shuffled_deck <- deck[sample(nrow(deck)), ]             # shuffle the desk using sample. Notice that sample just generates an index-set for deck.
+  
+  # Deal cards to players
+  player_hands <- list()                                  # initialize an empty list to contain hands of each players
+  
+  for (i in 1:num_players) {
+    
+    player_hands[[i]] <- shuffled_deck[((i - 1) * 5 + 1):(i * 5), ] # Deal 5 cards to each players, the order is just from the first card to the last card of the shuffled deck.
+    
+    cat("Player", i, "hand:\n")                         
+    print(player_hands[[i]])                              # This line is somewhat problematic. player_hands is a list of objects containing two vectors, which is not suitable for directly printing. 
+    hand_name <- get_poker_hand_name(player_hands[[i]]$Suit, player_hands[[i]]$Rank) # call "get_poker_hand_name" function to obtain the name of each hands give 2 vectors.
+    cat("Hand Name:", hand_name, "\n\n")
+  }
+}
+```
+
+### Task (d)
+
+First, we fix the "print" problem for displaying result, which has been already located.
 
 ```{r}
 # Define a function to simulate dealing a round of poker
@@ -364,10 +644,21 @@ deal_poker_round <- function(num_players) {
   
   # Deal cards to players
   player_hands <- list()
+  
   for (i in 1:num_players) {
-    player_hands[[i]] <- shuffled_deck[((i - 1) * 5 + 1):(i * 5), ] # Modified here
+    player_hands[[i]] <- shuffled_deck[((i - 1) * 5 + 1):(i * 5), ] 
     cat("Player", i, "hand:\n")
-    print(player_hands[[i]])
+    
+    # Modified
+    for (j in 1:5) {
+      # Instead of directly print the objects in a list, we choose to print the result element by element.
+      cat(toString(player_hands[[i]]$Suit[j]), toString(player_hands[[i]]$Rank[j]))
+      if (j != 5) {
+        cat(", ")
+      }
+    }
+    cat("\n")
+
     hand_name <- get_poker_hand_name(player_hands[[i]]$Suit, player_hands[[i]]$Rank)
     cat("Hand Name:", hand_name, "\n\n")
   }
@@ -375,20 +666,235 @@ deal_poker_round <- function(num_players) {
 
 ```
 
-Test 2 functions
+Test for $1_{st}$ modification.
 
 ```{r}
-# Example usage: Simulate a round of poker with 4 players
 deal_poker_round(4)
 ```
 
-Debug utility
+We check the problem given on the problem set description.
+
+> Are the inputs and outputs as described above?
+
+Yes, even before we fix the print problem. After the fix of the print problem, the look of outputs is nicer.
+
+> Are the hands valid (e.g. real cards, no duplicates, right number)?
+
+Yes, it is clear.
+
+> Are the names of the hands correct?
+
+No, at least we can find it cannot name "Royal flush". This problem will be fixed in later sessions.
+
+> Does it ensure no duplicates in cards across hands? What happens if you ask for more than 10 hands to be dealt (as there are only 52 cards in a standard deck)?
+
+It do ensure no duplicates in cards across hands. And if you ask for more than 10 hands to be dealt, an error massage written by us will be given.
+
+#### Hands-naming problem detection
+
+Deck shuffling and hands dealing are OK now. Since the hands generated are too random, we may directly call function `get_poker_hand_name` to test whether the program can name each hands.
 
 ```{r}
-
-suits <- c("Clubs","Spades","Diamonds","Spades","Hearts")
-ranks <- c(4,"Jack",9,3,3)
+# Debug utility
+suits <- c("Clubs","Clubs","Clubs","Clubs","Clubs")
+ranks <- c("Ace",10, "Jack","King","Queen")
 get_poker_hand_name(suits, ranks)
 ```
 
-"Hearts", "Diamonds", "Clubs", "Spades"
+Bug 1: It cannot name "Royal flush". The result is not surprising, since there are no codes checking "Royal flush".
+
+```{r}
+# Debug utility
+suits <- c("Spade","Spade","Spade","Spade","Spade")
+ranks <- c(4, 6, 5, 8, 7)
+get_poker_hand_name(suits, ranks)
+```
+
+No problem for "Straight flush".
+
+```{r}
+# Debug utility
+suits <- c("Spade","Club","Heart","Diamond","Spade")
+ranks <- c("Jack", "Jack", "Jack", "Jack", 7)
+get_poker_hand_name(suits, ranks)
+```
+
+No problem for "Four of a Kind".
+
+```{r}
+# Debug utility
+suits <- c("Spade","Club","Heart","Diamond","Diamond")
+ranks <- c("Jack", "Jack", 9, 9, "Jack")
+get_poker_hand_name(suits, ranks)
+```
+
+No problem for "Full House".
+
+```{r}
+# Debug utility
+suits <- c("Heart","Heart","Heart","Heart","Heart")
+ranks <- c("4", "Jack", 8, 2, 9)
+get_poker_hand_name(suits, ranks)
+```
+
+No problem for "Flush".
+
+```{r}
+# Debug utility
+suits <- c("Heart","Club","Club","Heart","Spade")
+ranks <- c(10, "Jack", 7, 8, 9)
+get_poker_hand_name(suits, ranks)
+```
+
+No problem for "Straight".
+
+```{r}
+# Debug utility
+suits <- c("Heart","Club","Club","Diamond","Spade")
+ranks <- c(7, "Jack", 7, 7, 3)
+get_poker_hand_name(suits, ranks)
+```
+
+No problem for "Three of a Kind".
+
+```{r}
+# Debug utility
+suits <- c("Heart","Club","Club","Diamond","Spade")
+ranks <- c(4, 4, 3, 3, "Queen")
+get_poker_hand_name(suits, ranks)
+```
+
+Bug 2: It cannot name "Two Pair". The line naming "Two Pair" intends to check "if all the cards in the hand is in pairs", which is impossible. Instead, it should implement checking "4 cards in the hand are in pairs".
+
+```{r}
+# Debug utility
+suits <- c("Heart","Club","Club","Diamond","Spade")
+ranks <- c("Ace", 8, "Ace", 4, "Queen")
+get_poker_hand_name(suits, ranks)
+```
+
+No problem for "One Pair".
+
+```{r}
+# Debug utility
+suits <- c("Heart","Club","Club","Diamond","Spade")
+ranks <- c("Ace", 8, 3, 4, "Queen")
+get_poker_hand_name(suits, ranks)
+```
+
+No problem for "One Pair".
+
+#### Debug 2 hands-naming problem
+
+Debug `get_poker_hand_name`
+
+```{r}
+# Define a function to determine the name of a poker hand
+get_poker_hand_name <- function(suits, ranks) {
+  # Throw error when input parameters are illegal.
+  if ((length(suits) != 5) || (length(ranks) != 5)){
+    stop("It is not a legal input. Case 1")
+  }
+  
+  suitsList <- c("Hearts", "Diamonds", "Clubs", "Spades")
+  for(s in suits){
+    if(!(s %in% suitsList)){
+      stop("It is not a legal input. Case 2")
+    }
+  }
+  
+  # Convert ranks into integers
+  # "Jack", "Queen", "King", "Ace" are to be converted to 11, 12, 13, 14, respectively.
+  
+  for(j in 1:length(ranks)){
+    if(identical(ranks[j], "Jack")){
+      ranks[j] <- 11
+    }
+    if(identical(ranks[j], "Queen")){
+      ranks[j] <- 12
+    }
+    if(identical(ranks[j], "King")){
+      ranks[j] <- 13
+    }
+    if(identical(ranks[j], "Ace")){
+      ranks[j] <- 14
+    }
+  }
+  
+  ranks <- as.numeric(ranks)
+  
+  if (length(unique(ranks)) == 5) {
+    if (max(ranks) - min(ranks) == 4) {
+      if (length(unique(suits)) == 1) {
+        # Modified here. Check royal flush.
+        if (max(ranks) == 14){
+          return("Royal flush")
+        } else {
+          return("Straight Flush")
+        }
+      } else {
+        return("Straight")
+      }
+    }
+  }
+  
+  
+  if (length(unique(ranks)) == 2) {
+    counts <- table(ranks)
+    if (max(counts) == 4) {
+      return("Four of a Kind")
+    }
+    if (max(counts) == 3) {
+      if (min(counts) == 2) {
+        return("Full House")
+      }
+    }
+  }
+  
+  if (length(unique(suits)) == 1) {
+    return("Flush")
+  }
+  counts <- table(ranks)
+  if (max(counts) == 3) {
+    return("Three of a Kind")
+  }
+  if (max(counts) == 2) {
+    
+    # Modified here. Find the second largest instead of smallest item in counts.
+    if (sort(counts, decreasing = TRUE)[2] == 2) {
+      return("Two Pair")
+    } else {
+      return("One Pair")
+    }
+  }
+  return("High Card")
+}
+```
+
+Check whether bug 1 is fixed.
+
+```{r}
+# Debug utility
+suits <- c("Clubs","Clubs","Clubs","Clubs","Clubs")
+ranks <- c("Ace",10, "Jack","King","Queen")
+get_poker_hand_name(suits, ranks)
+```
+
+No problem for "Royal flush".
+
+```{r}
+# Debug utility
+suits <- c("Hearts","Clubs","Clubs","Diamonds","Spades")
+ranks <- c(4, 4, 3, 3, "Queen")
+get_poker_hand_name(suits, ranks)
+```
+
+No problem for "Two Pair".
+
+#### Overall testing
+
+```{r}
+deal_poker_round(4)
+```
+
+All the problem has been fixed now.
