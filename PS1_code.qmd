@@ -1,6 +1,8 @@
 ---
 title: "PS1_code"
-format: html
+format:
+  html:
+    embed-resources: true
 editor: visual
 ---
 
@@ -359,7 +361,6 @@ Demonstrate these two functions for different numbers of players
 ```{r}
 set.seed(456)
 ```
-
 
 ```{r}
 # Test 1
